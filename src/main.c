@@ -170,6 +170,34 @@ int main() {
     ssd1306_rect(&ssd, 1, 1, 126, 62, 1, 0);
     ssd1306_line(&ssd, 1, 15, 126, 15, 1);
 
+    //cima
+    ssd1306_line(&ssd, 5, 5, 5, 11, 1);
+    ssd1306_line(&ssd, 6, 4, 10, 4, 1);
+    ssd1306_line(&ssd, 10, 5, 20, 5, 1);
+
+    //baixo
+    ssd1306_line(&ssd, 6, 12, 10, 12, 1);
+    ssd1306_line(&ssd, 10, 11, 20, 11, 1);
+
+    //primeira faixa
+    ssd1306_line(&ssd, 8, 4, 8, 12, 1);
+    ssd1306_line(&ssd, 9, 4, 9, 12, 1);
+    //segunda faixa
+    ssd1306_line(&ssd, 13, 5, 13, 11, 1);
+    ssd1306_line(&ssd, 14, 5, 14, 11, 1);
+    //multiplicador
+    ssd1306_line(&ssd, 17, 5, 17, 11, 1);
+    ssd1306_line(&ssd, 18, 5, 18, 11, 1);
+    //tolerancia
+    ssd1306_line(&ssd, 21, 5, 21, 11, 1);
+    ssd1306_line(&ssd, 22, 5, 22, 11, 1);
+
+    //cima
+    ssd1306_line(&ssd, 20, 4, 24, 4, 1);
+    ssd1306_line(&ssd, 20, 12, 24, 12, 1);
+    ssd1306_line(&ssd, 25, 5, 25, 11, 1);
+
+
     snprintf(display_text, sizeof(display_text), "faixa 1 %s", d1);
     ssd1306_draw_string(&ssd, display_text, 2, 20);
 
