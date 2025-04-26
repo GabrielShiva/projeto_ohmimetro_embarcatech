@@ -27,6 +27,12 @@ float diff = 0.0;
 float rx_e24_value = 0.0;
 float normalized_rx = 0.0;
 
+int digit1 = 0;
+int digit2= 0;
+const char *d1 = "\n";
+const char *d2 = "\n";
+const char *mult = "\n";
+
 // definição de tabela para valores dos resistores e24
 const float e24_values[] = {1.0, 1.1, 1.2, 1.3, 1.5, 1.6, 1.8, 2.0, 2.2, 2.4, 2.7, 3.0, 3.3, 3.6, 3.9, 4.3, 4.7, 5.1, 5.6, 6.2, 6.8, 7.5, 8.2, 9.1};
 const int num_e24 = sizeof(e24_values)/sizeof(e24_values[0]);
@@ -96,6 +102,12 @@ const char *get_multiplier_color(uint8_t exponent) {
   return "preto";
 }
 
+float calculate_adc_threshold(int r_known) {
+  float r_threshold = r_known * 20;
+  float voltage = (r_threshold / (r_known + r_threshold)) * ADC_VREF;
+  return (voltage / ADC_VREF) * ADC_RESOLUTION;
+}
+
 int main() {
   // Para ser utilizado o modo BOOTSEL com botão B
   gpio_init(botaoB);
@@ -142,43 +154,45 @@ int main() {
 
     float media = soma / 500.0f;
 
-    // Fórmula simplificada: R_x = R_conhecido * ADC_encontrado /(ADC_RESOLUTION - adc_encontrado)
-    R_x = (R_conhecido * media) / (ADC_RESOLUTION - media);
+    bool is_infinity_resistance = false;
 
-    rx_e24_value = get_comercial_value(R_x);
-    normalized_rx = rx_e24_value;
-    exponent_rx = 0;
+    float adc_threshold = calculate_adc_threshold(R_conhecido); // Dynamic threshold
 
-    while (normalized_rx >= 10.0) {
-      normalized_rx = normalized_rx / 10;
-      exponent_rx = exponent_rx + 1;
+    if (media >= adc_threshold) {
+      is_infinity_resistance = true;
+    } else {
+      // Calcula da resistencia em ohms e obtenção do valor comercial mais próximo
+      R_x = (R_conhecido * media) / (ADC_RESOLUTION - media);
+      rx_e24_value = get_comercial_value(R_x);
+
+      // Calculo das cores de cada banda
+      normalized_rx = rx_e24_value;
+      exponent_rx = 0;
+
+      while (normalized_rx >= 10.0) {
+        normalized_rx = normalized_rx / 10;
+        exponent_rx = exponent_rx + 1;
+      }
+
+      digit1 = (int)normalized_rx;
+      digit2 = (int)(normalized_rx * 10) % 10;
+      d1 = digit_colors[digit1 % 10];
+      d2 = digit_colors[digit2 % 10];
+      mult = get_multiplier_color(exponent_rx - 1);
     }
 
-    int digit1 = (int)normalized_rx;
-    int digit2 = (int)(normalized_rx * 10) % 10;
-    const char *d1 = digit_colors[digit1 % 10];
-    const char *d2 = digit_colors[digit2 % 10];
-    const char *mult = get_multiplier_color(exponent_rx - 1);
-
+    // Limpeza do display
     ssd1306_fill(&ssd, false);
-    // ssd1306_draw_string(&ssd, "Rx= ", 2, 2);
-
-    // sprintf(display_text, "%.0f ohms", rx_e24_value);
-    // ssd1306_draw_string(&ssd, display_text, 30, 2);
-
     // desenho dos contornos do layout do display
     ssd1306_rect(&ssd, 1, 1, 126, 62, 1, 0);
     ssd1306_line(&ssd, 1, 15, 126, 15, 1);
-
     //cima
     ssd1306_line(&ssd, 5, 5, 5, 11, 1);
     ssd1306_line(&ssd, 6, 4, 10, 4, 1);
     ssd1306_line(&ssd, 10, 5, 20, 5, 1);
-
     //baixo
     ssd1306_line(&ssd, 6, 12, 10, 12, 1);
     ssd1306_line(&ssd, 10, 11, 20, 11, 1);
-
     //primeira faixa
     ssd1306_line(&ssd, 8, 4, 8, 12, 1);
     ssd1306_line(&ssd, 9, 4, 9, 12, 1);
@@ -191,45 +205,34 @@ int main() {
     //tolerancia
     ssd1306_line(&ssd, 21, 5, 21, 11, 1);
     ssd1306_line(&ssd, 22, 5, 22, 11, 1);
-
     //cima
     ssd1306_line(&ssd, 20, 4, 24, 4, 1);
     ssd1306_line(&ssd, 20, 12, 24, 12, 1);
     ssd1306_line(&ssd, 25, 5, 25, 11, 1);
+    // linha da tabela
+    ssd1306_line(&ssd, 62, 15, 62, 62, 1);
 
+    if (is_infinity_resistance) {
+      ssd1306_draw_string(&ssd, "Infinito", 30, 5);
+    } else {
+      sprintf(display_text, "%.0f ohms", rx_e24_value);
+      ssd1306_draw_string(&ssd, display_text, 28, 5);
+    }
 
-    snprintf(display_text, sizeof(display_text), "faixa 1 %s", d1);
-    ssd1306_draw_string(&ssd, display_text, 2, 20);
+    // snprintf(display_text, sizeof(display_text), "faixa 1 %s", d1);
+    ssd1306_draw_string(&ssd, "faixa 1", 4, 20);
 
-    snprintf(display_text, sizeof(display_text), "faixa 2 %s", d2);
-    ssd1306_draw_string(&ssd, display_text, 2, 30);
+    // snprintf(display_text, sizeof(display_text), "faixa 2 %s", d2);
+    ssd1306_draw_string(&ssd, "faixa 2", 4, 30);
 
-    snprintf(display_text, sizeof(display_text), "multipl %s", mult);
-    ssd1306_draw_string(&ssd, display_text, 2, 40);
+    // snprintf(display_text, sizeof(display_text), "multipl %s", mult);
+    ssd1306_draw_string(&ssd, "multip", 4, 40);
 
-    ssd1306_draw_string(&ssd, "toleran Au", 2, 50);
+    ssd1306_draw_string(&ssd, "toleran", 4, 50);
 
     ssd1306_send_data(&ssd);
     sleep_ms(700);
-
-    // sprintf(str_x, "%1.0f", media); // Converte o inteiro em string
-    // sprintf(str_y, "%1.0f", R_x);   // Converte o float em string
-
-    // cor = !cor;
-    //  Atualiza o conteúdo do display com animações
-    // ssd1306_fill(&ssd, !cor);                          // Limpa o display
-    // ssd1306_rect(&ssd, 3, 3, 122, 60, cor, !cor);      // Desenha um retângulo
-    // ssd1306_line(&ssd, 3, 25, 123, 25, cor);           // Desenha uma linha
-    // ssd1306_line(&ssd, 3, 37, 123, 37, cor);           // Desenha uma linha
-    // ssd1306_draw_string(&ssd, "CEPEDI   TIC37", 8, 6); // Desenha uma string
-    // ssd1306_draw_string(&ssd, "EMBARCATECH", 20, 16);  // Desenha uma string
-    // ssd1306_draw_string(&ssd, "  Ohmimetro", 10, 28);  // Desenha uma string
-    // ssd1306_draw_string(&ssd, "ADC", 13, 41);          // Desenha uma string
-    // ssd1306_draw_string(&ssd, "Resisten.", 50, 41);    // Desenha uma string
-    // ssd1306_line(&ssd, 44, 37, 44, 60, cor);           // Desenha uma linha vertical
-    // ssd1306_draw_string(&ssd, str_x, 8, 52);           // Desenha uma string
-    // ssd1306_draw_string(&ssd, str_y, 59, 52);          // Desenha uma string
-    // ssd1306_send_data(&ssd);                           // Atualiza o display
-    // sleep_ms(700);
   }
+
+  return 0;
 }
