@@ -35,7 +35,7 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(projeto_02_ohmimetro main.c )
+add_executable(projeto_02_ohmimetro src/main.c src/ssd1306.c )
 
 pico_set_program_name(projeto_02_ohmimetro "projeto_02_ohmimetro")
 pico_set_program_version(projeto_02_ohmimetro "0.1")
