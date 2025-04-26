@@ -186,6 +186,7 @@ int main() {
     // desenho dos contornos do layout do display
     ssd1306_rect(&ssd, 1, 1, 126, 62, 1, 0);
     ssd1306_line(&ssd, 1, 15, 126, 15, 1);
+    ssd1306_line(&ssd, 1, 16, 126, 16, 1);
     //cima
     ssd1306_line(&ssd, 5, 5, 5, 11, 1);
     ssd1306_line(&ssd, 6, 4, 10, 4, 1);
@@ -209,26 +210,39 @@ int main() {
     ssd1306_line(&ssd, 20, 4, 24, 4, 1);
     ssd1306_line(&ssd, 20, 12, 24, 12, 1);
     ssd1306_line(&ssd, 25, 5, 25, 11, 1);
-    // linha da tabela
-    ssd1306_line(&ssd, 62, 15, 62, 62, 1);
 
     if (is_infinity_resistance) {
       ssd1306_draw_string(&ssd, "Infinito", 30, 5);
+
+      ssd1306_draw_string(&ssd, "Resistencia", 20, 20);
+      ssd1306_draw_string(&ssd, "Muito", 40, 31);
+      ssd1306_draw_string(&ssd, "Grande", 36, 42);
     } else {
+      // linha da tabela
+      ssd1306_line(&ssd, 63, 15, 63, 62, 1);
+      ssd1306_line(&ssd, 64, 15, 64, 62, 1);
+
       sprintf(display_text, "%.0f ohms", rx_e24_value);
       ssd1306_draw_string(&ssd, display_text, 28, 5);
+
+      ssd1306_draw_string(&ssd, "faixa 1", 5, 20);
+      snprintf(display_text, sizeof(display_text), "%s", d1);
+      ssd1306_draw_string(&ssd, display_text, 68, 20);
+      ssd1306_line(&ssd, 1, 29, 126, 29, 1);
+
+      ssd1306_draw_string(&ssd, "faixa 2", 5, 31);
+      snprintf(display_text, sizeof(display_text), "%s", d2);
+      ssd1306_draw_string(&ssd, display_text, 68, 31);
+      ssd1306_line(&ssd, 1, 40, 126, 40, 1);
+
+      ssd1306_draw_string(&ssd, "multip.", 5, 42);
+      snprintf(display_text, sizeof(display_text), "%s", mult);
+      ssd1306_draw_string(&ssd, display_text, 68, 42);
+      ssd1306_line(&ssd, 1, 52, 126, 52, 1);
+
+      ssd1306_draw_string(&ssd, "toler.", 5, 54);
+      ssd1306_draw_string(&ssd, "Au", 68, 54);
     }
-
-    // snprintf(display_text, sizeof(display_text), "faixa 1 %s", d1);
-    ssd1306_draw_string(&ssd, "faixa 1", 4, 20);
-
-    // snprintf(display_text, sizeof(display_text), "faixa 2 %s", d2);
-    ssd1306_draw_string(&ssd, "faixa 2", 4, 30);
-
-    // snprintf(display_text, sizeof(display_text), "multipl %s", mult);
-    ssd1306_draw_string(&ssd, "multip", 4, 40);
-
-    ssd1306_draw_string(&ssd, "toleran", 4, 50);
 
     ssd1306_send_data(&ssd);
     sleep_ms(700);
