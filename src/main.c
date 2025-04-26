@@ -14,12 +14,12 @@
 #define ADC_PIN 28 // GPIO para o voltímetro
 #define Botao_A 5  // GPIO para botão A
 
-int R_conhecido = 220;
+int R_conhecido = 465;
 int ADC_RESOLUTION = 4095;
 int exponent = 0;
 int exponent_rx = 0;
 float R_x = 0.0;
-float ADC_VREF = 3.30;
+float ADC_VREF = 3.29;
 float normalized = 0.0;
 float closest_resistor = 0.0;
 float min_diff = 0.0;
@@ -128,9 +128,7 @@ int main() {
   adc_gpio_init(ADC_PIN); // GPIO 28 como entrada analógica
 
   float tensao;
-  char str_x[5]; // Buffer para armazenar a string
-  char str_y[5]; // Buffer para armazenar a string
-  char bands_str[20];
+  char display_text[20]; // Buffer para armazenar a string
 
   bool cor = true;
   while (true) {
@@ -160,22 +158,26 @@ int main() {
     int digit2 = (int)(normalized_rx * 10) % 10;
     const char *d1 = digit_colors[digit1 % 10];
     const char *d2 = digit_colors[digit2 % 10];
-    const char *mult = get_multiplier_color(exponent_rx);
-
-    sprintf(str_y, "%.0f ohms", rx_e24_value);
+    const char *mult = get_multiplier_color(exponent_rx - 1);
 
     ssd1306_fill(&ssd, false);
-    ssd1306_draw_string(&ssd, "Rx= ", 2, 6);
-    ssd1306_draw_string(&ssd, str_y, 30, 6);
+    // ssd1306_draw_string(&ssd, "Rx= ", 2, 2);
 
-    snprintf(bands_str, sizeof(bands_str), "faixa 1 %s", d1);
-    ssd1306_draw_string(&ssd, bands_str, 2, 20);
+    // sprintf(display_text, "%.0f ohms", rx_e24_value);
+    // ssd1306_draw_string(&ssd, display_text, 30, 2);
 
-    snprintf(bands_str, sizeof(bands_str), "faixa 2 %s", d2);
-    ssd1306_draw_string(&ssd, bands_str, 2, 30);
+    // desenho dos contornos do layout do display
+    ssd1306_rect(&ssd, 1, 1, 126, 62, 1, 0);
+    ssd1306_line(&ssd, 1, 15, 126, 15, 1);
 
-    snprintf(bands_str, sizeof(bands_str), "multipl %s", mult);
-    ssd1306_draw_string(&ssd, bands_str, 2, 40);
+    snprintf(display_text, sizeof(display_text), "faixa 1 %s", d1);
+    ssd1306_draw_string(&ssd, display_text, 2, 20);
+
+    snprintf(display_text, sizeof(display_text), "faixa 2 %s", d2);
+    ssd1306_draw_string(&ssd, display_text, 2, 30);
+
+    snprintf(display_text, sizeof(display_text), "multipl %s", mult);
+    ssd1306_draw_string(&ssd, display_text, 2, 40);
 
     ssd1306_draw_string(&ssd, "toleran Au", 2, 50);
 
