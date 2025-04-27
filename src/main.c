@@ -5,12 +5,19 @@
 #include "pico/bootrom.h"
 #include "hardware/adc.h"
 #include "hardware/i2c.h"
+#include "hardware/pio.h"
+#include "hardware/clocks.h"
 #include "inc/ssd1306.h"
 #include "inc/font.h"
+#include "inc/ws2818b.h"
+
+// Biblioteca gerada pelo arquivo .pio durante compilação.
+#include "ws2818b.pio.h"
 
 // Definição de macros gerais
 #define ADC_PIN 28
 #define BTN_B_PIN 6
+#define BTN_A_PIN 5
 float adc_resolution = 4095;
 
 // Definição de macros para o protocolo I2C (SSD1306)
@@ -26,10 +33,12 @@ float average_adc_measures = 0.0f;
 float unknown_resistor = 0.0;
 float closest_e24_resistor = 0.0;
 
-const char *d1 = "\n";
-const char *d2 = "\n";
-const char *mult = "\n";
-char display_text[20];
+// define variáveis para debounce do botão
+volatile uint32_t last_time_btn_press = 0;
+bool is_matrix_enabled = true;
+
+// debounce delay
+const uint32_t debounce_delay_ms = 260;
 
 ssd1306_t ssd;
 
@@ -39,6 +48,25 @@ const int num_e24_resistor_values = sizeof(e24_resistor_values) / sizeof(e24_res
 
 const char *available_digit_colors[10] = {"preto", "marrom", "vermelho", "laranja", "amarelo", "verde", "azul", "violeta", "cinza", "branco"};
 const char *resistor_band_colors[3] = {0};
+int resistor_band_color_indexes[3] = {
+  0, // primeira banda
+  0, // segunda banda
+  0  // multiplicador
+};
+int resistor_band_list[10][3] = {
+  {0  , 0  , 0  }, // preto
+  {255, 50 , 0  }, // marrom
+  {255, 0   , 0  }, // vermelho
+  {255, 180, 0  }, // laranja
+  {215, 215, 0  }, // amarelo
+  {0  , 255, 0  }, // verde
+  {0  , 0  , 255}, // azul
+  {130, 0, 250}, // violeta
+  {80, 80, 30}, // cinza
+  {255, 255, 255}  // branco
+};
+
+char display_text[20] = {0};
 
 void i2c_setup(uint baud_in_kilo) {
   i2c_init(I2C_PORT, baud_in_kilo * 1000);
@@ -60,8 +88,17 @@ void ssd1306_setup(ssd1306_t *ssd_ptr) {
 }
 
 void gpio_irq_handler(uint gpio, uint32_t events) {
-  if (gpio == BTN_B_PIN) {
-    reset_usb_boot(0, 0);
+  uint32_t current_time = to_ms_since_boot(get_absolute_time()); // retorna o tempo total em ms desde o boot do rp2040
+
+  // verifica se a diff entre o tempo atual e a ultima vez que o botão foi pressionado é maior que o tempo de debounce
+  if (current_time - last_time_btn_press > debounce_delay_ms) {
+    last_time_btn_press = current_time;
+
+    if (gpio == BTN_A_PIN) {
+      is_matrix_enabled = !is_matrix_enabled;
+    } else if (gpio == BTN_B_PIN) {
+      reset_usb_boot(0, 0);
+    }
   }
 }
 
@@ -117,6 +154,10 @@ void get_band_color(float *resistor_value) {
   resistor_band_colors[0] = available_digit_colors[first_band_value % 10];
   resistor_band_colors[1] = available_digit_colors[second_band_value % 10];
   resistor_band_colors[2] = (exponent >= 0 && exponent <= 9) ? available_digit_colors[exponent] : "erro";
+
+  resistor_band_color_indexes[0] = first_band_value % 10;
+  resistor_band_color_indexes[1] = second_band_value % 10;
+  resistor_band_color_indexes[2] = (exponent >= 0 && exponent <= 9) ? exponent : 0;
 }
 
 void draw_display_layout(ssd1306_t *ssd_ptr) {
@@ -199,6 +240,11 @@ int main() {
   gpio_set_irq_enabled_with_callback(BTN_B_PIN, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
   // [FIM] modo BOOTSEL associado ao botão B (apenas para desenvolvedores)
 
+  gpio_init(BTN_A_PIN);
+  gpio_set_dir(BTN_A_PIN, GPIO_IN);
+  gpio_pull_up(BTN_A_PIN);
+  gpio_set_irq_enabled(BTN_A_PIN, GPIO_IRQ_EDGE_FALL, true);
+
   // Inicialização do protocolo I2C com 400Khz e inicialização do display
   i2c_setup(400);
   ssd1306_setup(&ssd);
@@ -206,6 +252,13 @@ int main() {
   // Inicialização do ADC para o pino 28
   adc_init();
   adc_gpio_init(ADC_PIN);
+
+  // Inicializa matriz de LEDs NeoPixel.
+  npInit(LED_PIN);
+  npClear();
+
+  npSetBrightness(255);
+  npWrite();
 
   while (true) {
     // Seleciona o ADC para pino 28 como entrada analógica
@@ -236,10 +289,34 @@ int main() {
     ssd1306_draw_string(&ssd, display_text, 29, 5);
 
     // Exibição das cores de cada banda (Tolerância Multiplicador Faixa_2 Faixa_1)
-    ssd1306_draw_string(&ssd, "Au 5%", 60, 20);
+    ssd1306_draw_string(&ssd, "Au (5%)", 60, 20);
     ssd1306_draw_string(&ssd, resistor_band_colors[2], 60, 31);
     ssd1306_draw_string(&ssd, resistor_band_colors[1], 60, 42);
     ssd1306_draw_string(&ssd, resistor_band_colors[0], 60, 52);
+
+    // Verifica se matriz está habilitada
+    if (is_matrix_enabled) {
+      // Exibe as cores na matriz
+      npSetLED(13,
+        resistor_band_list[resistor_band_color_indexes[0]][0],
+        resistor_band_list[resistor_band_color_indexes[0]][1],
+        resistor_band_list[resistor_band_color_indexes[0]][2]
+      ); // primeira banda
+      npSetLED(12,
+        resistor_band_list[resistor_band_color_indexes[1]][0],
+        resistor_band_list[resistor_band_color_indexes[1]][1],
+        resistor_band_list[resistor_band_color_indexes[1]][2]
+      ); // segunda banda
+      npSetLED(11,
+        resistor_band_list[resistor_band_color_indexes[2]][0],
+        resistor_band_list[resistor_band_color_indexes[2]][1],
+        resistor_band_list[resistor_band_color_indexes[2]][2]
+      ); // multiplicador
+    } else {
+      npClear();
+    }
+
+    npWrite();
 
     ssd1306_send_data(&ssd);
     sleep_ms(700);

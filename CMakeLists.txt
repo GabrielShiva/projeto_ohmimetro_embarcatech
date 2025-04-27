@@ -40,6 +40,8 @@ add_executable(projeto_02_ohmimetro src/main.c src/ssd1306.c )
 pico_set_program_name(projeto_02_ohmimetro "projeto_02_ohmimetro")
 pico_set_program_version(projeto_02_ohmimetro "0.1")
 
+pico_generate_pio_header(projeto_02_ohmimetro ${CMAKE_CURRENT_LIST_DIR}/ws2818b.pio)
+
 # Modify the below lines to enable/disable output over UART/USB
 pico_enable_stdio_uart(projeto_02_ohmimetro 1)
 pico_enable_stdio_usb(projeto_02_ohmimetro 1)
@@ -57,6 +59,8 @@ target_include_directories(projeto_02_ohmimetro PRIVATE
 target_link_libraries(projeto_02_ohmimetro
         hardware_i2c
         hardware_adc
+        hardware_pio
+        hardware_clocks
         )
 
 pico_add_extra_outputs(projeto_02_ohmimetro)
