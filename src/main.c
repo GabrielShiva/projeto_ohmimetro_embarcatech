@@ -7,9 +7,9 @@
 #include "hardware/i2c.h"
 #include "hardware/pio.h"
 #include "hardware/clocks.h"
-#include "inc/ssd1306.h"
-#include "inc/font.h"
-#include "inc/ws2818b.h"
+#include "lib/ssd1306.h"
+#include "lib/font.h"
+#include "lib/ws2818b.h"
 
 // Biblioteca gerada pelo arquivo .pio durante compilação.
 #include "ws2818b.pio.h"
