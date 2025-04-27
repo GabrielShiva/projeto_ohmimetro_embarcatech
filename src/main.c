@@ -94,7 +94,7 @@ float get_closest_e24_resistor(float resistor_value) {
   return closest_resistor * powf(10.0, exponent);
 }
 
-char get_band_color(float *resistor_value) {
+void get_band_color(float *resistor_value) {
   // Cálculo das cores de cada banda do resistor (4 bandas)
   float normalized_resistor = *resistor_value;
   int exponent = -1;
@@ -117,6 +117,78 @@ char get_band_color(float *resistor_value) {
   resistor_band_colors[0] = available_digit_colors[first_band_value % 10];
   resistor_band_colors[1] = available_digit_colors[second_band_value % 10];
   resistor_band_colors[2] = (exponent >= 0 && exponent <= 9) ? available_digit_colors[exponent] : "erro";
+}
+
+void draw_display_layout(ssd1306_t *ssd_ptr) {
+  // desenho dos contornos do layout do display
+  ssd1306_rect(ssd_ptr, 1, 1, 126, 62, 1, 0);
+  //cima
+  ssd1306_line(ssd_ptr, 5, 5, 5, 11, 1);
+  ssd1306_line(ssd_ptr, 6, 4, 10, 4, 1);
+  ssd1306_line(ssd_ptr, 10, 5, 20, 5, 1);
+  //baixo
+  ssd1306_line(ssd_ptr, 6, 12, 10, 12, 1);
+  ssd1306_line(ssd_ptr, 10, 11, 20, 11, 1);
+  //primeira faixa
+  ssd1306_line(ssd_ptr, 8, 4, 8, 12, 1);
+  ssd1306_line(ssd_ptr, 9, 4, 9, 12, 1);
+  //segunda faixa
+  ssd1306_line(ssd_ptr, 13, 5, 13, 11, 1);
+  ssd1306_line(ssd_ptr, 14, 5, 14, 11, 1);
+  //multiplicador
+  ssd1306_line(ssd_ptr, 17, 5, 17, 11, 1);
+  ssd1306_line(ssd_ptr, 18, 5, 18, 11, 1);
+  //tolerancia
+  ssd1306_line(ssd_ptr, 21, 5, 21, 11, 1);
+  ssd1306_line(ssd_ptr, 22, 5, 22, 11, 1);
+  //cima
+  ssd1306_line(ssd_ptr, 20, 4, 24, 4, 1);
+  ssd1306_line(ssd_ptr, 20, 12, 24, 12, 1);
+  ssd1306_line(ssd_ptr, 25, 5, 25, 11, 1);
+
+  // seta para a tolerancia
+  ssd1306_line(ssd_ptr, 21, 15, 21, 23, 1);
+  ssd1306_line(ssd_ptr, 22, 15, 22, 23, 1);
+
+  ssd1306_line(ssd_ptr, 22, 22, 50, 22, 1);
+  ssd1306_line(ssd_ptr, 22, 23, 50, 23, 1);
+
+  ssd1306_line(ssd_ptr, 50, 20, 50, 25, 1);
+  ssd1306_line(ssd_ptr, 51, 21, 51, 24, 1);
+  ssd1306_line(ssd_ptr, 52, 22, 52, 23, 1);
+
+  // seta para o multiplicador
+  ssd1306_line(ssd_ptr, 17, 15, 17, 35, 1);
+  ssd1306_line(ssd_ptr, 18, 15, 18, 35, 1);
+
+  ssd1306_line(ssd_ptr, 18, 34, 50, 34, 1);
+  ssd1306_line(ssd_ptr, 18, 35, 50, 35, 1);
+
+  ssd1306_line(ssd_ptr, 50, 32, 50, 37, 1);
+  ssd1306_line(ssd_ptr, 51, 33, 51, 36, 1);
+  ssd1306_line(ssd_ptr, 52, 34, 52, 35, 1);
+
+  // seta para a segunda faixa
+  ssd1306_line(ssd_ptr, 13, 15, 13, 47, 1);
+  ssd1306_line(ssd_ptr, 14, 15, 14, 47, 1);
+
+  ssd1306_line(ssd_ptr, 14, 46, 50, 46, 1);
+  ssd1306_line(ssd_ptr, 14, 47, 50, 47, 1);
+
+  ssd1306_line(ssd_ptr, 50, 44, 50, 49, 1);
+  ssd1306_line(ssd_ptr, 51, 45, 51, 48, 1);
+  ssd1306_line(ssd_ptr, 52, 46, 52, 47, 1);
+
+  // seta para a primeira faixa
+  ssd1306_line(ssd_ptr, 8, 15, 8, 57, 1);
+  ssd1306_line(ssd_ptr, 9, 15, 9, 57, 1);
+
+  ssd1306_line(ssd_ptr, 9, 56, 50, 56, 1);
+  ssd1306_line(ssd_ptr, 9, 57, 50, 57, 1);
+
+  ssd1306_line(ssd_ptr, 50, 54, 50, 59, 1);
+  ssd1306_line(ssd_ptr, 51, 55, 51, 58, 1);
+  ssd1306_line(ssd_ptr, 52, 56, 52, 57, 1);
 }
 
 int main() {
@@ -157,89 +229,17 @@ int main() {
 
     // Limpeza do display
     ssd1306_fill(&ssd, false);
-    // desenho dos contornos do layout do display
-    ssd1306_rect(&ssd, 1, 1, 126, 62, 1, 0);
-    //cima
-    ssd1306_line(&ssd, 5, 5, 5, 11, 1);
-    ssd1306_line(&ssd, 6, 4, 10, 4, 1);
-    ssd1306_line(&ssd, 10, 5, 20, 5, 1);
-    //baixo
-    ssd1306_line(&ssd, 6, 12, 10, 12, 1);
-    ssd1306_line(&ssd, 10, 11, 20, 11, 1);
-    //primeira faixa
-    ssd1306_line(&ssd, 8, 4, 8, 12, 1);
-    ssd1306_line(&ssd, 9, 4, 9, 12, 1);
-    //segunda faixa
-    ssd1306_line(&ssd, 13, 5, 13, 11, 1);
-    ssd1306_line(&ssd, 14, 5, 14, 11, 1);
-    //multiplicador
-    ssd1306_line(&ssd, 17, 5, 17, 11, 1);
-    ssd1306_line(&ssd, 18, 5, 18, 11, 1);
-    //tolerancia
-    ssd1306_line(&ssd, 21, 5, 21, 11, 1);
-    ssd1306_line(&ssd, 22, 5, 22, 11, 1);
-    //cima
-    ssd1306_line(&ssd, 20, 4, 24, 4, 1);
-    ssd1306_line(&ssd, 20, 12, 24, 12, 1);
-    ssd1306_line(&ssd, 25, 5, 25, 11, 1);
+    draw_display_layout(&ssd);
 
-    // seta para a tolerancia
-    ssd1306_line(&ssd, 21, 15, 21, 23, 1);
-    ssd1306_line(&ssd, 22, 15, 22, 23, 1);
-
-    ssd1306_line(&ssd, 22, 22, 50, 22, 1);
-    ssd1306_line(&ssd, 22, 23, 50, 23, 1);
-
-    ssd1306_line(&ssd, 50, 20, 50, 25, 1);
-    ssd1306_line(&ssd, 51, 21, 51, 24, 1);
-    ssd1306_line(&ssd, 52, 22, 52, 23, 1);
-
-    // seta para o multiplicador
-    ssd1306_line(&ssd, 17, 15, 17, 35, 1);
-    ssd1306_line(&ssd, 18, 15, 18, 35, 1);
-
-    ssd1306_line(&ssd, 18, 34, 50, 34, 1);
-    ssd1306_line(&ssd, 18, 35, 50, 35, 1);
-
-    ssd1306_line(&ssd, 50, 32, 50, 37, 1);
-    ssd1306_line(&ssd, 51, 33, 51, 36, 1);
-    ssd1306_line(&ssd, 52, 34, 52, 35, 1);
-
-    // seta para a segunda faixa
-    ssd1306_line(&ssd, 13, 15, 13, 47, 1);
-    ssd1306_line(&ssd, 14, 15, 14, 47, 1);
-
-    ssd1306_line(&ssd, 14, 46, 50, 46, 1);
-    ssd1306_line(&ssd, 14, 47, 50, 47, 1);
-
-    ssd1306_line(&ssd, 50, 44, 50, 49, 1);
-    ssd1306_line(&ssd, 51, 45, 51, 48, 1);
-    ssd1306_line(&ssd, 52, 46, 52, 47, 1);
-
-    // seta para a primeira faixa
-    ssd1306_line(&ssd, 8, 15, 8, 57, 1);
-    ssd1306_line(&ssd, 9, 15, 9, 57, 1);
-
-    ssd1306_line(&ssd, 9, 56, 50, 56, 1);
-    ssd1306_line(&ssd, 9, 57, 50, 57, 1);
-
-    ssd1306_line(&ssd, 50, 54, 50, 59, 1);
-    ssd1306_line(&ssd, 51, 55, 51, 58, 1);
-    ssd1306_line(&ssd, 52, 56, 52, 57, 1);
-
+    // Exibição do valor comercial da resistência mais próxima
     sprintf(display_text, "%.0f ohms", closest_e24_resistor);
     ssd1306_draw_string(&ssd, display_text, 29, 5);
 
-    ssd1306_draw_string(&ssd, "Au(tol.)", 60, 20);
-
-    snprintf(display_text, sizeof(display_text), "%s", resistor_band_colors[2]);
-    ssd1306_draw_string(&ssd, display_text, 60, 31);
-
-    snprintf(display_text, sizeof(display_text), "%s", resistor_band_colors[1]);
-    ssd1306_draw_string(&ssd, display_text, 60, 42);
-
-    snprintf(display_text, sizeof(display_text), "%s", resistor_band_colors[0]);
-    ssd1306_draw_string(&ssd, display_text, 60, 52);
+    // Exibição das cores de cada banda (Tolerância Multiplicador Faixa_2 Faixa_1)
+    ssd1306_draw_string(&ssd, "Au 5%", 60, 20);
+    ssd1306_draw_string(&ssd, resistor_band_colors[2], 60, 31);
+    ssd1306_draw_string(&ssd, resistor_band_colors[1], 60, 42);
+    ssd1306_draw_string(&ssd, resistor_band_colors[0], 60, 52);
 
     ssd1306_send_data(&ssd);
     sleep_ms(700);
