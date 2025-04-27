@@ -12,8 +12,8 @@ project(Teste_Voltimetro C CXX ASM)
 pico_sdk_init()
 
 add_executable(${PROJECT_NAME}
-        src/main.c
-        src/ssd1306.c
+        main.c
+        lib/ssd1306.c
         )
 
 pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/ws2818b.pio)
