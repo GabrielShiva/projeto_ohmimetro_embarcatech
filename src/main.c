@@ -14,12 +14,12 @@
 #define ADC_PIN 28 // GPIO para o voltímetro
 #define Botao_A 5  // GPIO para botão A
 
-int R_conhecido = 465;
+int R_conhecido = 470;
 int ADC_RESOLUTION = 4095;
 int exponent = 0;
 int exponent_rx = 0;
 float R_x = 0.0;
-float ADC_VREF = 3.29;
+float ADC_VREF = 3.30;
 float normalized = 0.0;
 float closest_resistor = 0.0;
 float min_diff = 0.0;
@@ -37,8 +37,8 @@ const char *mult = "\n";
 const float e24_values[] = {1.0, 1.1, 1.2, 1.3, 1.5, 1.6, 1.8, 2.0, 2.2, 2.4, 2.7, 3.0, 3.3, 3.6, 3.9, 4.3, 4.7, 5.1, 5.6, 6.2, 6.8, 7.5, 8.2, 9.1};
 const int num_e24 = sizeof(e24_values)/sizeof(e24_values[0]);
 
-const char *digit_colors[] = {"pret", "marr", "verm", "lara", "amar", "verde", "azul", "viol", "cinz", "bran"};
-const char *multiplier_colors[] = {"pret", "marr", "verm", "lara", "amar", "verde", "azul", "viol", "cinz", "bran"};
+const char *digit_colors[] = {"preto", "marrom", "vermelho", "laranja", "amarelo", "verde", "azul", "violeta", "cinza", "branco"};
+const char *multiplier_colors[] = {"preto", "marrom", "vermelho", "laranja", "amarelo", "verde", "azul", "violeta", "cinza", "branco"};
 
 // Trecho para modo BOOTSEL com botão B
 #include "pico/bootrom.h"
@@ -102,12 +102,6 @@ const char *get_multiplier_color(uint8_t exponent) {
   return "preto";
 }
 
-float calculate_adc_threshold(int r_known) {
-  float r_threshold = r_known * 20;
-  float voltage = (r_threshold / (r_known + r_threshold)) * ADC_VREF;
-  return (voltage / ADC_VREF) * ADC_RESOLUTION;
-}
-
 int main() {
   // Para ser utilizado o modo BOOTSEL com botão B
   gpio_init(botaoB);
@@ -154,39 +148,31 @@ int main() {
 
     float media = soma / 500.0f;
 
-    bool is_infinity_resistance = false;
+    // Calcula da resistencia em ohms e obtenção do valor comercial mais próximo
+    R_x = (R_conhecido * media) / (ADC_RESOLUTION - media);
+    rx_e24_value = get_comercial_value(R_x);
 
-    float adc_threshold = calculate_adc_threshold(R_conhecido); // Dynamic threshold
+    // Calculo das cores de cada banda
+    normalized_rx = rx_e24_value;
+    exponent_rx = 0;
 
-    if (media >= adc_threshold) {
-      is_infinity_resistance = true;
-    } else {
-      // Calcula da resistencia em ohms e obtenção do valor comercial mais próximo
-      R_x = (R_conhecido * media) / (ADC_RESOLUTION - media);
-      rx_e24_value = get_comercial_value(R_x);
-
-      // Calculo das cores de cada banda
-      normalized_rx = rx_e24_value;
-      exponent_rx = 0;
-
-      while (normalized_rx >= 10.0) {
-        normalized_rx = normalized_rx / 10;
-        exponent_rx = exponent_rx + 1;
-      }
-
-      digit1 = (int)normalized_rx;
-      digit2 = (int)(normalized_rx * 10) % 10;
-      d1 = digit_colors[digit1 % 10];
-      d2 = digit_colors[digit2 % 10];
-      mult = get_multiplier_color(exponent_rx - 1);
+    while (normalized_rx >= 10.0) {
+      normalized_rx = normalized_rx / 10;
+      exponent_rx = exponent_rx + 1;
     }
+
+    digit1 = (int)normalized_rx;
+    digit2 = (int)(normalized_rx * 10) % 10;
+    d1 = digit_colors[digit1 % 10];
+    d2 = digit_colors[digit2 % 10];
+    mult = get_multiplier_color(exponent_rx - 1);
 
     // Limpeza do display
     ssd1306_fill(&ssd, false);
     // desenho dos contornos do layout do display
     ssd1306_rect(&ssd, 1, 1, 126, 62, 1, 0);
-    ssd1306_line(&ssd, 1, 15, 126, 15, 1);
-    ssd1306_line(&ssd, 1, 16, 126, 16, 1);
+    // ssd1306_line(&ssd, 1, 15, 126, 15, 1);
+    // ssd1306_line(&ssd, 1, 16, 126, 16, 1);
     //cima
     ssd1306_line(&ssd, 5, 5, 5, 11, 1);
     ssd1306_line(&ssd, 6, 4, 10, 4, 1);
@@ -211,38 +197,63 @@ int main() {
     ssd1306_line(&ssd, 20, 12, 24, 12, 1);
     ssd1306_line(&ssd, 25, 5, 25, 11, 1);
 
-    if (is_infinity_resistance) {
-      ssd1306_draw_string(&ssd, "Infinito", 30, 5);
+    // seta para a tolerancia
+    ssd1306_line(&ssd, 21, 15, 21, 23, 1);
+    ssd1306_line(&ssd, 22, 15, 22, 23, 1);
 
-      ssd1306_draw_string(&ssd, "Resistencia", 20, 20);
-      ssd1306_draw_string(&ssd, "Muito", 40, 31);
-      ssd1306_draw_string(&ssd, "Grande", 36, 42);
-    } else {
-      // linha da tabela
-      ssd1306_line(&ssd, 63, 15, 63, 62, 1);
-      ssd1306_line(&ssd, 64, 15, 64, 62, 1);
+    ssd1306_line(&ssd, 22, 22, 50, 22, 1);
+    ssd1306_line(&ssd, 22, 23, 50, 23, 1);
 
-      sprintf(display_text, "%.0f ohms", rx_e24_value);
-      ssd1306_draw_string(&ssd, display_text, 28, 5);
+    ssd1306_line(&ssd, 50, 20, 50, 25, 1);
+    ssd1306_line(&ssd, 51, 21, 51, 24, 1);
+    ssd1306_line(&ssd, 52, 22, 52, 23, 1);
 
-      ssd1306_draw_string(&ssd, "faixa 1", 5, 20);
-      snprintf(display_text, sizeof(display_text), "%s", d1);
-      ssd1306_draw_string(&ssd, display_text, 68, 20);
-      ssd1306_line(&ssd, 1, 29, 126, 29, 1);
+    // seta para o multiplicador
+    ssd1306_line(&ssd, 17, 15, 17, 35, 1);
+    ssd1306_line(&ssd, 18, 15, 18, 35, 1);
 
-      ssd1306_draw_string(&ssd, "faixa 2", 5, 31);
-      snprintf(display_text, sizeof(display_text), "%s", d2);
-      ssd1306_draw_string(&ssd, display_text, 68, 31);
-      ssd1306_line(&ssd, 1, 40, 126, 40, 1);
+    ssd1306_line(&ssd, 18, 34, 50, 34, 1);
+    ssd1306_line(&ssd, 18, 35, 50, 35, 1);
 
-      ssd1306_draw_string(&ssd, "multip.", 5, 42);
-      snprintf(display_text, sizeof(display_text), "%s", mult);
-      ssd1306_draw_string(&ssd, display_text, 68, 42);
-      ssd1306_line(&ssd, 1, 52, 126, 52, 1);
+    ssd1306_line(&ssd, 50, 32, 50, 37, 1);
+    ssd1306_line(&ssd, 51, 33, 51, 36, 1);
+    ssd1306_line(&ssd, 52, 34, 52, 35, 1);
 
-      ssd1306_draw_string(&ssd, "toler.", 5, 54);
-      ssd1306_draw_string(&ssd, "Au", 68, 54);
-    }
+    // seta para a segunda faixa
+    ssd1306_line(&ssd, 13, 15, 13, 47, 1);
+    ssd1306_line(&ssd, 14, 15, 14, 47, 1);
+
+    ssd1306_line(&ssd, 14, 46, 50, 46, 1);
+    ssd1306_line(&ssd, 14, 47, 50, 47, 1);
+
+    ssd1306_line(&ssd, 50, 44, 50, 49, 1);
+    ssd1306_line(&ssd, 51, 45, 51, 48, 1);
+    ssd1306_line(&ssd, 52, 46, 52, 47, 1);
+
+    // seta para a primeira faixa
+    ssd1306_line(&ssd, 8, 15, 8, 57, 1);
+    ssd1306_line(&ssd, 9, 15, 9, 57, 1);
+
+    ssd1306_line(&ssd, 9, 56, 50, 56, 1);
+    ssd1306_line(&ssd, 9, 57, 50, 57, 1);
+
+    ssd1306_line(&ssd, 50, 54, 50, 59, 1);
+    ssd1306_line(&ssd, 51, 55, 51, 58, 1);
+    ssd1306_line(&ssd, 52, 56, 52, 57, 1);
+
+    sprintf(display_text, "%.0f ohms", rx_e24_value);
+    ssd1306_draw_string(&ssd, display_text, 29, 5);
+
+    ssd1306_draw_string(&ssd, "Au(tol.)", 60, 20);
+
+    snprintf(display_text, sizeof(display_text), "%s", mult);
+    ssd1306_draw_string(&ssd, display_text, 60, 31);
+
+    snprintf(display_text, sizeof(display_text), "%s", d2);
+    ssd1306_draw_string(&ssd, display_text, 60, 42);
+
+    snprintf(display_text, sizeof(display_text), "%s", d1);
+    ssd1306_draw_string(&ssd, display_text, 60, 52);
 
     ssd1306_send_data(&ssd);
     sleep_ms(700);
