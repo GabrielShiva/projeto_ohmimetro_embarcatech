@@ -1,22 +1,28 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include "pico/stdlib.h"
+#include "pico/bootrom.h"
 #include "hardware/adc.h"
 #include "hardware/i2c.h"
 #include "inc/ssd1306.h"
 #include "inc/font.h"
-#include <math.h>
 
+// Definição de macros gerais
+#define ADC_PIN 28
+#define BTN_B_PIN 6
+#define ADC_RESOLUTION 4095
+
+// Definição de macros para o protocolo I2C (SSD1306)
 #define I2C_PORT i2c1
 #define I2C_SDA 14
 #define I2C_SCL 15
-#define endereco 0x3C
-#define ADC_PIN 28 // GPIO para o voltímetro
-#define Botao_A 5  // GPIO para botão A
+#define SSD1306_ADDRESS 0x3C
 
-int R_conhecido = 470;
-int ADC_RESOLUTION = 4095;
+// Inicialização de variáveis
+int reference_resistor = 470;
 int exponent = 0;
+
 int exponent_rx = 0;
 float R_x = 0.0;
 float ADC_VREF = 3.30;
@@ -33,19 +39,38 @@ const char *d1 = "\n";
 const char *d2 = "\n";
 const char *mult = "\n";
 
-// definição de tabela para valores dos resistores e24
+ssd1306_t ssd;
+
+// Definição de tabela para valores dos resistores e24
 const float e24_values[] = {1.0, 1.1, 1.2, 1.3, 1.5, 1.6, 1.8, 2.0, 2.2, 2.4, 2.7, 3.0, 3.3, 3.6, 3.9, 4.3, 4.7, 5.1, 5.6, 6.2, 6.8, 7.5, 8.2, 9.1};
 const int num_e24 = sizeof(e24_values)/sizeof(e24_values[0]);
 
 const char *digit_colors[] = {"preto", "marrom", "vermelho", "laranja", "amarelo", "verde", "azul", "violeta", "cinza", "branco"};
 const char *multiplier_colors[] = {"preto", "marrom", "vermelho", "laranja", "amarelo", "verde", "azul", "violeta", "cinza", "branco"};
 
-// Trecho para modo BOOTSEL com botão B
-#include "pico/bootrom.h"
-#define botaoB 6
+void i2c_setup(uint baud_in_kilo) {
+  i2c_init(I2C_PORT, baud_in_kilo * 1000);
+
+  gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);
+  gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);
+  gpio_pull_up(I2C_SDA);
+  gpio_pull_up(I2C_SCL);
+}
+
+void ssd1306_setup(ssd1306_t *ssd_ptr) {
+  ssd1306_init(ssd_ptr, WIDTH, HEIGHT, false, SSD1306_ADDRESS, I2C_PORT); // Inicializa o display
+  ssd1306_config(ssd_ptr);                                                // Configura o display
+  ssd1306_send_data(ssd_ptr);                                             // Envia os dados para o display
+
+  // Limpa o display. O display inicia com todos os pixels apagados.
+  ssd1306_fill(ssd_ptr, false);
+  ssd1306_send_data(ssd_ptr);
+}
 
 void gpio_irq_handler(uint gpio, uint32_t events) {
-   reset_usb_boot(0, 0);
+  if (gpio == BTN_B_PIN) {
+    reset_usb_boot(0, 0);
+  }
 }
 
 float get_comercial_value(float resistor_value) {
@@ -103,32 +128,18 @@ const char *get_multiplier_color(uint8_t exponent) {
 }
 
 int main() {
-  // Para ser utilizado o modo BOOTSEL com botão B
-  gpio_init(botaoB);
-  gpio_set_dir(botaoB, GPIO_IN);
-  gpio_pull_up(botaoB);
-  gpio_set_irq_enabled_with_callback(botaoB, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
-  // Aqui termina o trecho para modo BOOTSEL com botão B
+  // [INÍCIO] modo BOOTSEL associado ao botão B (apenas para desenvolvedores)
+  gpio_init(BTN_B_PIN);
+  gpio_set_dir(BTN_B_PIN, GPIO_IN);
+  gpio_pull_up(BTN_B_PIN);
+  gpio_set_irq_enabled_with_callback(BTN_B_PIN, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
+  // [FIM] modo BOOTSEL associado ao botão B (apenas para desenvolvedores)
 
-  gpio_init(Botao_A);
-  gpio_set_dir(Botao_A, GPIO_IN);
-  gpio_pull_up(Botao_A);
+  // Inicialização do protocolo I2C para o display com 400Khz
+  i2c_setup(400);
 
-  // I2C Initialisation. Using it at 400Khz.
-  i2c_init(I2C_PORT, 400 * 1000);
-
-  gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);                    // Set the GPIO pin function to I2C
-  gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);                    // Set the GPIO pin function to I2C
-  gpio_pull_up(I2C_SDA);                                        // Pull up the data line
-  gpio_pull_up(I2C_SCL);                                        // Pull up the clock line
-  ssd1306_t ssd;                                                // Inicializa a estrutura do display
-  ssd1306_init(&ssd, WIDTH, HEIGHT, false, endereco, I2C_PORT); // Inicializa o display
-  ssd1306_config(&ssd);                                         // Configura o display
-  ssd1306_send_data(&ssd);                                      // Envia os dados para o display
-
-  // Limpa o display. O display inicia com todos os pixels apagados.
-  ssd1306_fill(&ssd, false);
-  ssd1306_send_data(&ssd);
+  // Iniciliazação do display
+  ssd1306_setup(&ssd);
 
   adc_init();
   adc_gpio_init(ADC_PIN); // GPIO 28 como entrada analógica
@@ -149,7 +160,7 @@ int main() {
     float media = soma / 500.0f;
 
     // Calcula da resistencia em ohms e obtenção do valor comercial mais próximo
-    R_x = (R_conhecido * media) / (ADC_RESOLUTION - media);
+    R_x = (reference_resistor * media) / (ADC_RESOLUTION - media);
     rx_e24_value = get_comercial_value(R_x);
 
     // Calculo das cores de cada banda
