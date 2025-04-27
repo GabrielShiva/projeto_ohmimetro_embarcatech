@@ -11,7 +11,7 @@
 // Definição de macros gerais
 #define ADC_PIN 28
 #define BTN_B_PIN 6
-#define ADC_RESOLUTION 4095
+float adc_resolution = 4095;
 
 // Definição de macros para o protocolo I2C (SSD1306)
 #define I2C_PORT i2c1
@@ -21,32 +21,24 @@
 
 // Inicialização de variáveis
 int reference_resistor = 470;
-int exponent = 0;
+float cumulative_adc_measure = 0.0f;
+float average_adc_measures = 0.0f;
+float unknown_resistor = 0.0;
+float closest_e24_resistor = 0.0;
 
-int exponent_rx = 0;
-float R_x = 0.0;
-float ADC_VREF = 3.30;
-float normalized = 0.0;
-float closest_resistor = 0.0;
-float min_diff = 0.0;
-float diff = 0.0;
-float rx_e24_value = 0.0;
-float normalized_rx = 0.0;
-
-int digit1 = 0;
-int digit2= 0;
 const char *d1 = "\n";
 const char *d2 = "\n";
 const char *mult = "\n";
+char display_text[20];
 
 ssd1306_t ssd;
 
-// Definição de tabela para valores dos resistores e24
-const float e24_values[] = {1.0, 1.1, 1.2, 1.3, 1.5, 1.6, 1.8, 2.0, 2.2, 2.4, 2.7, 3.0, 3.3, 3.6, 3.9, 4.3, 4.7, 5.1, 5.6, 6.2, 6.8, 7.5, 8.2, 9.1};
-const int num_e24 = sizeof(e24_values)/sizeof(e24_values[0]);
+// Definição de tabela para valores dos resistores da série e24
+const float e24_resistor_values[24] = {1.0, 1.1, 1.2, 1.3, 1.5, 1.6, 1.8, 2.0, 2.2, 2.4, 2.7, 3.0, 3.3, 3.6, 3.9, 4.3, 4.7, 5.1, 5.6, 6.2, 6.8, 7.5, 8.2, 9.1};
+const int num_e24_resistor_values = sizeof(e24_resistor_values) / sizeof(e24_resistor_values[0]);
 
-const char *digit_colors[] = {"preto", "marrom", "vermelho", "laranja", "amarelo", "verde", "azul", "violeta", "cinza", "branco"};
-const char *multiplier_colors[] = {"preto", "marrom", "vermelho", "laranja", "amarelo", "verde", "azul", "violeta", "cinza", "branco"};
+const char *available_digit_colors[10] = {"preto", "marrom", "vermelho", "laranja", "amarelo", "verde", "azul", "violeta", "cinza", "branco"};
+const char *resistor_band_colors[3] = {0};
 
 void i2c_setup(uint baud_in_kilo) {
   i2c_init(I2C_PORT, baud_in_kilo * 1000);
@@ -73,58 +65,58 @@ void gpio_irq_handler(uint gpio, uint32_t events) {
   }
 }
 
-float get_comercial_value(float resistor_value) {
+float get_closest_e24_resistor(float resistor_value) {
   if (resistor_value <= 0) {
      return 0.0;
   }
 
-  normalized = resistor_value;
-  exponent = 0;
+  float normalized_resistor = resistor_value;
+  float exponent = 0.0f;
 
-  while (normalized >= 10) {
-    normalized = normalized / 10;
-    exponent = exponent + 1;
+  // Normaliza o valor fornecido para a faixa [0-10]
+  while (normalized_resistor >= 10) {
+    normalized_resistor = normalized_resistor / 10;
+    exponent = exponent + 1.0;
   }
 
-  closest_resistor = e24_values[0];
-  min_diff = 0.0;
+  float closest_resistor = e24_resistor_values[0];
+  float min_diff = fabs(normalized_resistor - e24_resistor_values[0]);
 
-  if (normalized >= closest_resistor) {
-    min_diff = normalized - closest_resistor;
-  } else {
-    min_diff = closest_resistor - normalized;
-  }
+  for (int i = 0; i < num_e24_resistor_values; i++) {
+    float curr_diff = fabs(normalized_resistor - e24_resistor_values[i]);
 
-  for (int i = 0; i < num_e24; i++) {
-    if (normalized >= e24_values[i]) {
-      diff = normalized - e24_values[i];
-    } else {
-      diff = e24_values[i] - normalized;
-    }
-
-    if (diff < min_diff) {
-      min_diff = diff;
-      closest_resistor = e24_values[i];
+    if (curr_diff < min_diff) {
+      min_diff = curr_diff;
+      closest_resistor = e24_resistor_values[i];
     }
   }
 
   return closest_resistor * powf(10.0, exponent);
 }
 
-const char *get_multiplier_color(uint8_t exponent) {
-  if (exponent == -2) {
-    return "prata";
+char get_band_color(float *resistor_value) {
+  // Cálculo das cores de cada banda do resistor (4 bandas)
+  float normalized_resistor = *resistor_value;
+  int exponent = -1;
+
+  // Normaliza o valor fornecido para a faixa [0-10]
+  while (normalized_resistor >= 10.0) {
+    normalized_resistor = normalized_resistor / 10;
+    exponent = exponent + 1;
   }
 
-  if (exponent == -1) {
-    return "ouro";
-  }
+  // Obtenção do valor da primeira banda
+  // EX.: 3.7 => (int)(3.7) => 3
+  int first_band_value = (int)normalized_resistor;
 
-  if (exponent >= 0 && exponent <= 9) {
-    return multiplier_colors[exponent];
-  }
+  // Obtenção do valor da segunda banda
+  // EX.: 3.7 => 3.7 * 10 => 37 => 37 % 10 => 7.0 => (int)(7.0) => 7
+  int second_band_value = (int)(normalized_resistor * 10) % 10;
 
-  return "preto";
+  // Definição da das Bandas 1, 2 e multiplicador
+  resistor_band_colors[0] = available_digit_colors[first_band_value % 10];
+  resistor_band_colors[1] = available_digit_colors[second_band_value % 10];
+  resistor_band_colors[2] = (exponent >= 0 && exponent <= 9) ? available_digit_colors[exponent] : "erro";
 }
 
 int main() {
@@ -135,55 +127,38 @@ int main() {
   gpio_set_irq_enabled_with_callback(BTN_B_PIN, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
   // [FIM] modo BOOTSEL associado ao botão B (apenas para desenvolvedores)
 
-  // Inicialização do protocolo I2C para o display com 400Khz
+  // Inicialização do protocolo I2C com 400Khz e inicialização do display
   i2c_setup(400);
-
-  // Iniciliazação do display
   ssd1306_setup(&ssd);
 
+  // Inicialização do ADC para o pino 28
   adc_init();
-  adc_gpio_init(ADC_PIN); // GPIO 28 como entrada analógica
+  adc_gpio_init(ADC_PIN);
 
-  float tensao;
-  char display_text[20]; // Buffer para armazenar a string
-
-  bool cor = true;
   while (true) {
-    adc_select_input(2); // Seleciona o ADC para eixo X. O pino 28 como entrada analógica
+    // Seleciona o ADC para pino 28 como entrada analógica
+    adc_select_input(2);
 
-    float soma = 0.0f;
+    // Obtenção de várias leituras seguidas e média
+    cumulative_adc_measure = 0.0f;
+
     for (int i = 0; i < 500; i++) {
-      soma += adc_read();
+      cumulative_adc_measure += adc_read();
       sleep_ms(1);
     }
 
-    float media = soma / 500.0f;
+    average_adc_measures = cumulative_adc_measure / 500.0f;
 
-    // Calcula da resistencia em ohms e obtenção do valor comercial mais próximo
-    R_x = (reference_resistor * media) / (ADC_RESOLUTION - media);
-    rx_e24_value = get_comercial_value(R_x);
+    // Cálculo da resistencia em ohms e obtenção do valor comercial mais próximo
+    unknown_resistor = (reference_resistor * average_adc_measures) / (adc_resolution - average_adc_measures);
+    closest_e24_resistor = get_closest_e24_resistor(unknown_resistor);
 
-    // Calculo das cores de cada banda
-    normalized_rx = rx_e24_value;
-    exponent_rx = 0;
-
-    while (normalized_rx >= 10.0) {
-      normalized_rx = normalized_rx / 10;
-      exponent_rx = exponent_rx + 1;
-    }
-
-    digit1 = (int)normalized_rx;
-    digit2 = (int)(normalized_rx * 10) % 10;
-    d1 = digit_colors[digit1 % 10];
-    d2 = digit_colors[digit2 % 10];
-    mult = get_multiplier_color(exponent_rx - 1);
+    get_band_color(&closest_e24_resistor);
 
     // Limpeza do display
     ssd1306_fill(&ssd, false);
     // desenho dos contornos do layout do display
     ssd1306_rect(&ssd, 1, 1, 126, 62, 1, 0);
-    // ssd1306_line(&ssd, 1, 15, 126, 15, 1);
-    // ssd1306_line(&ssd, 1, 16, 126, 16, 1);
     //cima
     ssd1306_line(&ssd, 5, 5, 5, 11, 1);
     ssd1306_line(&ssd, 6, 4, 10, 4, 1);
@@ -252,18 +227,18 @@ int main() {
     ssd1306_line(&ssd, 51, 55, 51, 58, 1);
     ssd1306_line(&ssd, 52, 56, 52, 57, 1);
 
-    sprintf(display_text, "%.0f ohms", rx_e24_value);
+    sprintf(display_text, "%.0f ohms", closest_e24_resistor);
     ssd1306_draw_string(&ssd, display_text, 29, 5);
 
     ssd1306_draw_string(&ssd, "Au(tol.)", 60, 20);
 
-    snprintf(display_text, sizeof(display_text), "%s", mult);
+    snprintf(display_text, sizeof(display_text), "%s", resistor_band_colors[2]);
     ssd1306_draw_string(&ssd, display_text, 60, 31);
 
-    snprintf(display_text, sizeof(display_text), "%s", d2);
+    snprintf(display_text, sizeof(display_text), "%s", resistor_band_colors[1]);
     ssd1306_draw_string(&ssd, display_text, 60, 42);
 
-    snprintf(display_text, sizeof(display_text), "%s", d1);
+    snprintf(display_text, sizeof(display_text), "%s", resistor_band_colors[0]);
     ssd1306_draw_string(&ssd, display_text, 60, 52);
 
     ssd1306_send_data(&ssd);
