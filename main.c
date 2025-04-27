@@ -27,7 +27,9 @@ float adc_resolution = 4095;
 #define SSD1306_ADDRESS 0x3C
 
 // Inicialização de variáveis
-int reference_resistor = 470;
+
+int reference_resistor = 470; // Resistência conhecida
+
 float cumulative_adc_measure = 0.0f;
 float average_adc_measures = 0.0f;
 float unknown_resistor = 0.0;
