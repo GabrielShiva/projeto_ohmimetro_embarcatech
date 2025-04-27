@@ -8,7 +8,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(PICO_BOARD pico_w CACHE STRING "Board type")
 include(pico_sdk_import.cmake)
 
-project(Teste_Voltimetro C CXX ASM)
+project(projeto_do_ohmimetro C CXX ASM)
 pico_sdk_init()
 
 add_executable(${PROJECT_NAME}
